@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #0b0e12;
+    color: #e8edf5;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(42, 52, 65, 0.6);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(42, 52, 65, 0.9);
+  }
+
+  /* Selection color matching design system */
+  ::selection {
+    background-color: rgba(91, 140, 255, 0.3);
+    color: #e8edf5;
+  }
+
+  /* Tabular figures for numeric values */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus visible outline matching design system */
+  *:focus-visible {
+    outline: 2px solid #5b8cff;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Category badge pattern: 12% alpha bg, 30% alpha border, solid text */
+  .badge-entry {
+    color: #5b8cff;
+    background-color: rgba(91, 140, 255, 0.12);
+    border: 1px solid rgba(91, 140, 255, 0.3);
+  }
+  .badge-route {
+    color: #39d6a0;
+    background-color: rgba(57, 214, 160, 0.12);
+    border: 1px solid rgba(57, 214, 160, 0.3);
+  }
+  .badge-model {
+    color: #f4bd58;
+    background-color: rgba(244, 189, 88, 0.12);
+    border: 1px solid rgba(244, 189, 88, 0.3);
+  }
+  .badge-component {
+    color: #a78bfa;
+    background-color: rgba(167, 139, 250, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+  }
+  .badge-config {
+    color: #8190a5;
+    background-color: rgba(129, 144, 165, 0.12);
+    border: 1px solid rgba(129, 144, 165, 0.3);
+  }
+  .badge-test {
+    color: #43c9d9;
+    background-color: rgba(67, 201, 217, 0.12);
+    border: 1px solid rgba(67, 201, 217, 0.3);
+  }
+  .badge-utility {
+    color: #9099a6;
+    background-color: rgba(144, 153, 166, 0.12);
+    border: 1px solid rgba(144, 153, 166, 0.3);
+  }
+  .badge-error {
+    color: #f07178;
+    background-color: rgba(240, 113, 120, 0.12);
+    border: 1px solid rgba(240, 113, 120, 0.3);
+  }
+  .badge-unknown {
+    color: #737f90;
+    background-color: rgba(115, 127, 144, 0.12);
+    border: 1px solid rgba(115, 127, 144, 0.3);
+  }
+
+  /* Evidence citation highlight in Monaco */
+  .citation-highlight,
+  .citation-line-highlight {
+    background-color: rgba(244, 189, 88, 0.15) !important;
+    border-left: 3px solid #f4bd58 !important;
+  }
+
+  .citation-glyph {
+    background-color: #f4bd58 !important;
+    width: 4px !important;
+    margin-left: 2px;
+  }
+
+  /* Graph dot matrix background */
+  .graph-dot-bg {
+    background-image: radial-gradient(#b2c5ff 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.07;
+  }
+
+  /* Panel border pattern from design system */
+  .panel-border {
+    border: 1px solid #2a3441;
+  }
+
+  /* No-scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer utilities {
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse,
+    .animate-ping,
+    .animate-pulse-slow {
+      animation: none;
+    }
+
+    * {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}

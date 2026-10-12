@@ -1,0 +1,92 @@
+// Prisma schema for RepoRiddle backend
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Repository {
+  id                    String     @id
+  owner                 String
+  name                  String
+  fullName              String     @unique
+  description           String?
+  language              String
+  defaultBranch         String
+  commitSha             String
+  stars                 Int        @default(0)
+  fileCount             Int        @default(0)
+  detectedTechnologies String[]
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  analyses              Analysis[]
+
+  @@index([owner, name])
+  @@index([commitSha])
+}
+
+model Analysis {
+  id              String      @id @default(uuid())
+  repositoryId    String
+  repository      Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  status          String      @default("complete") // pending, reading_tree, complete, failed
+  isTruncated     Boolean     @default(false)
+  commitSha       String
+  graphData       Json?       // Stores GraphData { nodes, edges, nodeCount, edgeCount }
+  fileTree        Json?       // Stores hierarchical FileTreeNode
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  missions        Mission[]
+  submissions     Submission[]
+
+  @@index([repositoryId, commitSha])
+}
+
+model Mission {
+  id            String       @id
+  analysisId    String
+  analysis      Analysis     @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  type          String       // entry_point, route_location, error_handling
+  objective     String
+  startingClue  String
+  hints         String[]
+  relevantFiles String[]
+  order         Int
+  status        String       @default("locked") // active, available, locked, completed
+  submissions   Submission[]
+
+  @@index([analysisId])
+}
+
+model Session {
+  id          String       @id @default(uuid())
+  token       String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  submissions Submission[]
+
+  @@index([token])
+}
+
+model Submission {
+  id          String   @id @default(uuid())
+  sessionId   String?
+  session     Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  analysisId  String
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  missionId   String
+  mission     Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  answer      String
+  correct     Boolean
+  partial     Boolean
+  feedback    String
+  explanation String
+  evidence    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([analysisId, missionId])
+  @@index([sessionId])
+}
