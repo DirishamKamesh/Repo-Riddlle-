@@ -12,6 +12,8 @@ import {
   HintResponse,
   DashboardRepo,
   AnalysisStatus,
+  WorkflowGraphData,
+  GraphCoverage,
 } from '../types';
 
 export interface AnalysisDetailResponse {
@@ -25,7 +27,9 @@ export interface AnalysisDetailResponse {
 
 export interface GraphResponse {
   graph: GraphData;
+  workflowGraph?: WorkflowGraphData;
   fileTree: FileTreeNode;
+  coverage?: GraphCoverage;
 }
 
 export interface ApiClient {

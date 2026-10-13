@@ -9,10 +9,11 @@ import {
   Evidence,
   MissionFeedback,
   FileCategory,
+  WorkflowGraphData,
 } from '../types';
 import { DEMO_REPOSITORY } from '../mock/repository';
 import { DEMO_FILE_TREE } from '../mock/file-tree';
-import { DEMO_GRAPH_DATA } from '../mock/graph-data';
+import { DEMO_GRAPH_DATA, DEMO_WORKFLOW_GRAPH_DATA } from '../mock/graph-data';
 import {
   DEMO_MISSIONS,
   DEMO_MISSION_SUMMARIES,
@@ -30,6 +31,8 @@ interface InvestigationState {
   repository: Repository | null;
   fileTree: FileTreeNode | null;
   graphData: GraphData | null;
+  workflowGraphData: WorkflowGraphData | null;
+  graphViewMode: 'dependency' | 'workflow';
   selectedFilePath: string | null;
   selectedFileContent: SourceFile | null;
   fileContentCache: Record<string, SourceFile>;
@@ -58,6 +61,7 @@ interface InvestigationState {
   resetFeedback: () => void;
   setCategoryFilter: (category: FileCategory | null) => void;
   setSearchFilter: (query: string) => void;
+  setGraphViewMode: (mode: 'dependency' | 'workflow') => void;
 }
 
 export const useInvestigationStore = create<InvestigationState>((set, get) => ({
@@ -69,6 +73,8 @@ export const useInvestigationStore = create<InvestigationState>((set, get) => ({
   repository: DEMO_REPOSITORY,
   fileTree: DEMO_FILE_TREE,
   graphData: DEMO_GRAPH_DATA,
+  workflowGraphData: DEMO_WORKFLOW_GRAPH_DATA,
+  graphViewMode: 'dependency',
   selectedFilePath: 'src/server.ts',
   selectedFileContent: DEMO_SOURCE_FILES['src/server.ts'] || null,
   fileContentCache: { ...DEMO_SOURCE_FILES },
@@ -92,6 +98,8 @@ export const useInvestigationStore = create<InvestigationState>((set, get) => ({
       repository: DEMO_REPOSITORY,
       fileTree: DEMO_FILE_TREE,
       graphData: DEMO_GRAPH_DATA,
+      workflowGraphData: DEMO_WORKFLOW_GRAPH_DATA,
+      graphViewMode: 'dependency',
       selectedFilePath: 'src/server.ts',
       selectedFileContent: DEMO_SOURCE_FILES['src/server.ts'] || null,
       fileContentCache: { ...DEMO_SOURCE_FILES },
@@ -180,6 +188,7 @@ export const useInvestigationStore = create<InvestigationState>((set, get) => ({
         repository: analysisRes.repository,
         fileTree: analysisRes.fileTree,
         graphData: graphRes.graph,
+        workflowGraphData: graphRes.workflowGraph || null,
         missions: missionsRes,
         activeMissionId,
         activeMission,
@@ -474,5 +483,9 @@ export const useInvestigationStore = create<InvestigationState>((set, get) => ({
 
   setSearchFilter: (query) => {
     set({ searchFilter: query });
+  },
+
+  setGraphViewMode: (mode) => {
+    set({ graphViewMode: mode });
   },
 }));

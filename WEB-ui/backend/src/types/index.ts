@@ -46,6 +46,9 @@ export interface GraphNode {
   fetched: boolean;
   summary: string | null;
   parentDir: string;
+  incomingImportsCount?: number;
+  outgoingImportsCount?: number;
+  parseError?: string | null;
 }
 
 export interface GraphEdge {
@@ -55,6 +58,29 @@ export interface GraphEdge {
   type: 'import';
   confirmed: boolean;
   label?: string;
+  specifier?: string;
+  importedSymbols?: string[];
+  isTypeOnly?: boolean;
+  kind?: 'static' | 'dynamic' | 're_export' | 'require';
+  line?: number;
+}
+
+export interface GraphCoverage {
+  totalInventoryFiles: number;
+  eligibleFiles: number;
+  analyzedFiles: number;
+  skippedFiles: number;
+  parseFailedFiles: number;
+  isTruncated: boolean;
+  unresolvedImportsCount: number;
+  resolvedImportsCount: number;
+}
+
+export interface UnresolvedImport {
+  sourceFile: string;
+  specifier: string;
+  line: number;
+  reason: string;
 }
 
 export interface GraphData {
@@ -62,6 +88,44 @@ export interface GraphData {
   edges: GraphEdge[];
   nodeCount: number;
   edgeCount: number;
+  coverage?: GraphCoverage;
+  unresolvedImports?: UnresolvedImport[];
+}
+
+export type WorkflowRelation =
+  | 'boots'
+  | 'mounts_router'
+  | 'applies_middleware'
+  | 'invokes_handler'
+  | 'accesses_model'
+  | 'calls_service'
+  | 'renders_component';
+
+export interface WorkflowEvidence {
+  filePath: string;
+  line: number;
+  snippet: string;
+  description: string;
+}
+
+export interface WorkflowEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation: WorkflowRelation;
+  label: string;
+  routePath?: string;
+  httpMethod?: string;
+  status: 'confirmed' | 'inferred' | 'unresolved';
+  evidence: WorkflowEvidence;
+}
+
+export interface WorkflowGraphData {
+  nodes: GraphNode[];
+  edges: WorkflowEdge[];
+  nodeCount: number;
+  edgeCount: number;
+  description?: string;
 }
 
 export interface FileTreeNode {

@@ -16,7 +16,7 @@ import {
 } from '../types';
 import { DEMO_REPOSITORY, DEMO_DASHBOARD_REPOS } from '../mock/repository';
 import { DEMO_FILE_TREE } from '../mock/file-tree';
-import { DEMO_GRAPH_DATA } from '../mock/graph-data';
+import { DEMO_GRAPH_DATA, DEMO_WORKFLOW_GRAPH_DATA } from '../mock/graph-data';
 import {
   DEMO_MISSIONS,
   DEMO_MISSION_SUMMARIES,
@@ -60,6 +60,7 @@ export class DemoApiAdapter implements ApiClient {
   async getGraph(_graphId: string): Promise<GraphResponse> {
     return {
       graph: DEMO_GRAPH_DATA,
+      workflowGraph: DEMO_WORKFLOW_GRAPH_DATA,
       fileTree: DEMO_FILE_TREE,
     };
   }

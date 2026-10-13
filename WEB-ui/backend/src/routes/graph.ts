@@ -17,7 +17,15 @@ graphRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
   res.json({
     graph: record.graphData,
+    workflowGraph: record.workflowGraph || {
+      nodes: record.graphData.nodes,
+      edges: [],
+      nodeCount: record.graphData.nodeCount,
+      edgeCount: 0,
+      description: 'No workflow execution patterns detected.',
+    },
     fileTree: record.fileTree,
+    coverage: record.graphData.coverage,
   });
 });
 

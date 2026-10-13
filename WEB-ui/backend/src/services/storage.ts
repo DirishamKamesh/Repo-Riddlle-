@@ -8,6 +8,7 @@ import {
   AnalysisStatus,
   DashboardRepo,
   MissionFeedback,
+  WorkflowGraphData,
 } from '../types/index.js';
 
 let prisma: PrismaClient | null = null;
@@ -28,6 +29,7 @@ export interface AnalysisRecord {
   stageDetail: string;
   commitSha: string;
   graphData: GraphData;
+  workflowGraph?: WorkflowGraphData;
   fileTree: FileTreeNode;
   missions: MissionDetail[];
   hintsUsed: Record<string, number>;
@@ -155,7 +157,7 @@ export const storage = {
             commitSha: found.commitSha,
             graphData: (found.graphData as any) || { nodes: [], edges: [], nodeCount: 0, edgeCount: 0 },
             fileTree: (found.fileTree as any) || { name: 'root', path: '', isDirectory: true, children: [] },
-            missions: found.missions.map((m) => ({
+            missions: (found.missions as any[]).map((m: any) => ({
               id: m.id,
               type: m.type as any,
               objective: m.objective,

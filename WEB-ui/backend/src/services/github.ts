@@ -184,6 +184,24 @@ function detectTechnologies(filePaths: string[]): string[] {
 }
 
 /**
+ * Fetch default branch and commit SHA for repository freshness validation
+ */
+export async function getLatestCommitSha(
+  owner: string,
+  repo: string
+): Promise<{ defaultBranch: string; commitSha: string }> {
+  const repoMeta = await fetchGithubApi(`/repos/${owner}/${repo}`);
+  const defaultBranch = repoMeta.default_branch || 'main';
+  const branchData = await fetchGithubApi(
+    `/repos/${owner}/${repo}/branches/${encodeURIComponent(defaultBranch)}`
+  );
+  return {
+    defaultBranch,
+    commitSha: branchData.commit.sha,
+  };
+}
+
+/**
  * Ingest repository: fetch metadata, commit SHA, and tree
  */
 export async function ingestRepository(owner: string, repo: string): Promise<IngestionResult> {

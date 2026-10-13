@@ -6,11 +6,24 @@ import {
   GraphEdge,
   GraphData,
   FileTreeNode,
+  GraphCoverage,
+  UnresolvedImport,
+  WorkflowGraphData,
 } from '../types/index.js';
 import { TreeFileItem } from './github.js';
+import { parseSourceAst, AstParseResult } from './ast-parser.js';
+import {
+  resolveModuleSpecifier,
+  parseTsConfigFile,
+} from './resolver.js';
+import type { TsConfigOptions } from './resolver.js';
+import { constructWorkflowGraph } from './workflow-analyzer.js';
+
+export { parseTsConfigFile };
+export type { TsConfigOptions };
 
 /**
- * Classify a file path by pattern
+ * Classify a file path by pattern heuristics
  */
 export function classifyFilePath(filePath: string): {
   category: FileCategory;
@@ -99,97 +112,42 @@ export function classifyFilePath(filePath: string): {
 }
 
 /**
- * Raw import match extracted from file source
+ * Raw import match extracted from file source (enhanced with AST parser)
  */
 export interface ExtractedImport {
   specifier: string;
   importedSymbols: string[];
   line: number;
+  isTypeOnly?: boolean;
+  kind?: 'static' | 'dynamic' | 're_export' | 'require';
 }
 
 /**
- * Extract static ES imports and CommonJS requires from source text
+ * Extract static ES imports, CommonJS requires, dynamic imports, and re-exports
+ * using the TypeScript Compiler API AST parser.
  */
-export function extractImportsFromSource(source: string): ExtractedImport[] {
-  const imports: ExtractedImport[] = [];
-  const lines = source.split('\n');
-
-  // Match: import ... from 'specifier' or import 'specifier'
-  const importRegex =
-    /(?:import\s+(?:([\w*\s{},$]+)\s+from\s+)?['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\))/g;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Skip full comment lines
-    if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
-      continue;
-    }
-
-    let match: RegExpExecArray | null;
-    while ((match = importRegex.exec(line)) !== null) {
-      const symbolsClause = match[1];
-      const specifier = match[2] || match[3] || match[4];
-
-      if (specifier) {
-        const symbols: string[] = [];
-        if (symbolsClause) {
-          // Parse symbols like { a, b as c } or defaultImport
-          const cleaned = symbolsClause.replace(/[{}]/g, '').trim();
-          symbols.push(...cleaned.split(',').map((s) => s.trim().split(/\s+as\s+/)[0]).filter(Boolean));
-        }
-
-        imports.push({
-          specifier,
-          importedSymbols: symbols,
-          line: i + 1,
-        });
-      }
-    }
-  }
-
-  return imports;
+export function extractImportsFromSource(source: string, filePath = 'file.ts'): ExtractedImport[] {
+  const parseResult = parseSourceAst(filePath, source);
+  return parseResult.imports.map((imp) => ({
+    specifier: imp.specifier,
+    importedSymbols: imp.importedSymbols,
+    line: imp.line,
+    isTypeOnly: imp.isTypeOnly,
+    kind: imp.kind,
+  }));
 }
 
 /**
- * Resolve relative import specifier against real repository files.
- * Returns the matching repository file path, or null if external/unresolved.
+ * Resolve import specifier against real repository files.
+ * Uses tsconfig path aliases, ESM .js extension rewriting, and index file resolution.
  */
 export function resolveImportTarget(
   sourceFilePath: string,
   importSpecifier: string,
-  existingFilePaths: Set<string>
+  existingFilePaths: Set<string>,
+  tsconfig?: TsConfigOptions
 ): string | null {
-  // Only resolve relative local imports
-  if (!importSpecifier.startsWith('.') && !importSpecifier.startsWith('/')) {
-    return null;
-  }
-
-  const sourceDir = path.dirname(sourceFilePath);
-  const rawTarget = path.posix.normalize(path.posix.join(sourceDir.replace(/\\/g, '/'), importSpecifier.replace(/\\/g, '/')));
-
-  // Candidate extensions and index resolutions
-  const candidates = [
-    rawTarget,
-    `${rawTarget}.ts`,
-    `${rawTarget}.tsx`,
-    `${rawTarget}.js`,
-    `${rawTarget}.jsx`,
-    `${rawTarget}.mjs`,
-    `${rawTarget}.cjs`,
-    `${rawTarget}.json`,
-    `${rawTarget}/index.ts`,
-    `${rawTarget}/index.tsx`,
-    `${rawTarget}/index.js`,
-    `${rawTarget}/index.jsx`,
-  ];
-
-  for (const candidate of candidates) {
-    if (existingFilePaths.has(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
+  return resolveModuleSpecifier(sourceFilePath, importSpecifier, existingFilePaths, tsconfig);
 }
 
 /**
@@ -203,7 +161,6 @@ export function buildFileTree(files: TreeFileItem[]): FileTreeNode {
     children: [],
   };
 
-  // Only build file tree from blobs (files), ignoring git tree directory items
   const blobFiles = files.filter((f) => f.type === 'blob' || !f.type);
 
   for (const file of blobFiles) {
@@ -252,7 +209,6 @@ export function buildFileTree(files: TreeFileItem[]): FileTreeNode {
     }
   }
 
-  // Sort directories first, then alphabetically
   function sortTree(node: FileTreeNode) {
     if (node.children) {
       node.children.sort((a, b) => {
@@ -269,24 +225,58 @@ export function buildFileTree(files: TreeFileItem[]): FileTreeNode {
 }
 
 /**
- * Generate GraphData containing verified nodes and static import edges
+ * Generate GraphData containing verified nodes from repository inventory and static import edges.
+ * Only draws edges verified by AST evidence and local file resolution.
  */
 export function constructArchitectureGraph(
   files: TreeFileItem[],
-  sources: Map<string, string>
-): GraphData {
+  sources: Map<string, string>,
+  tsconfig?: TsConfigOptions,
+  isTruncated = false
+): { graphData: GraphData; astMap: Map<string, AstParseResult> } {
   const allPathSet = new Set(files.map((f) => f.path));
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const edgeIdSet = new Set<string>();
+  const astMap = new Map<string, AstParseResult>();
+  const unresolvedImports: UnresolvedImport[] = [];
 
-  // Determine top files to include in graph (prioritize analyzed sources)
-  const graphFiles = files.filter((f) => sources.has(f.path) || files.length <= 40);
+  let parseFailedCount = 0;
+  let resolvedEdgesCount = 0;
 
-  for (const file of graphFiles) {
-    const { category, inferenceMethod } = classifyFilePath(file.path);
+  // Track incoming/outgoing import counts per file
+  const incomingCounts = new Map<string, number>();
+  const outgoingCounts = new Map<string, number>();
+
+  // 1. Process files and parse ASTs for fetched sources
+  for (const file of files) {
     const parentDir = path.dirname(file.path);
     const hasSource = sources.has(file.path);
+    let { category, inferenceMethod } = classifyFilePath(file.path);
+    let parseError: string | null = null;
+
+    if (hasSource) {
+      const sourceContent = sources.get(file.path)!;
+      const ast = parseSourceAst(file.path, sourceContent);
+      astMap.set(file.path, ast);
+
+      if (ast.parseError) {
+        parseError = ast.parseError;
+        parseFailedCount++;
+      } else {
+        // Refine category using AST framework detection
+        if (ast.framework.hasServerListen || ast.framework.isExpressApp) {
+          category = 'entry_point';
+          inferenceMethod = 'content_parsed';
+        } else if (ast.framework.isExpressRouter || ast.framework.routes.length > 0) {
+          category = 'route';
+          inferenceMethod = 'content_parsed';
+        } else if (ast.framework.jsxComponentReferences.length > 0 && category === 'unknown') {
+          category = 'component';
+          inferenceMethod = 'content_parsed';
+        }
+      }
+    }
 
     nodes.push({
       id: file.path,
@@ -294,44 +284,150 @@ export function constructArchitectureGraph(
       filePath: file.path,
       category,
       inferenceMethod,
-      language: file.path.endsWith('.ts') || file.path.endsWith('.tsx') ? 'typescript' : 'javascript',
+      language:
+        file.path.endsWith('.ts') || file.path.endsWith('.tsx')
+          ? 'typescript'
+          : file.path.endsWith('.json')
+            ? 'json'
+            : 'javascript',
       fetched: hasSource,
-      summary: hasSource ? `Verified module in ${parentDir || 'root'}` : null,
+      summary: hasSource
+        ? `Verified module in ${parentDir === '.' ? 'root' : parentDir}`
+        : null,
       parentDir: parentDir === '.' ? '' : parentDir,
+      parseError,
     });
-
-    if (hasSource) {
-      const sourceContent = sources.get(file.path)!;
-      const rawImports = extractImportsFromSource(sourceContent);
-
-      for (const imp of rawImports) {
-        const resolvedTarget = resolveImportTarget(file.path, imp.specifier, allPathSet);
-
-        // Only draw verified edges when target exists in repository!
-        if (resolvedTarget && resolvedTarget !== file.path) {
-          const edgeId = `edge:${file.path}->${resolvedTarget}`;
-          if (!edgeIdSet.has(edgeId)) {
-            edgeIdSet.add(edgeId);
-            edges.push({
-              id: edgeId,
-              source: file.path,
-              target: resolvedTarget,
-              type: 'import',
-              confirmed: true,
-              label: imp.importedSymbols.length > 0
-                ? `imports { ${imp.importedSymbols.slice(0, 2).join(', ')}${imp.importedSymbols.length > 2 ? '...' : ''} }`
-                : `imports ${imp.specifier}`,
-            });
-          }
-        }
-      }
-    }
   }
 
-  return {
+  // 2. Build verified dependency edges from AST parsed imports
+  for (const [filePath, ast] of astMap.entries()) {
+    let fileOutgoing = 0;
+
+    for (const imp of ast.imports) {
+      const resolvedTarget = resolveModuleSpecifier(
+        filePath,
+        imp.specifier,
+        allPathSet,
+        tsconfig
+      );
+
+      if (resolvedTarget && resolvedTarget !== filePath) {
+        const edgeId = `edge:${filePath}->${resolvedTarget}:${imp.kind || 'static'}`;
+        if (!edgeIdSet.has(edgeId)) {
+          edgeIdSet.add(edgeId);
+
+          let label = imp.isTypeOnly ? 'type import' : `imports`;
+          if (imp.importedSymbols && imp.importedSymbols.length > 0) {
+            const symPreview = imp.importedSymbols.slice(0, 2).join(', ');
+            label = `${imp.isTypeOnly ? 'type ' : ''}import { ${symPreview}${imp.importedSymbols.length > 2 ? '...' : ''} }`;
+          } else if (imp.kind === 're_export') {
+            label = 're-exports';
+          } else if (imp.kind === 'dynamic') {
+            label = 'dynamic import';
+          }
+
+          edges.push({
+            id: edgeId,
+            source: filePath,
+            target: resolvedTarget,
+            type: 'import',
+            confirmed: true,
+            label,
+            specifier: imp.specifier,
+            importedSymbols: imp.importedSymbols,
+            isTypeOnly: imp.isTypeOnly,
+            kind: imp.kind,
+            line: imp.line,
+          });
+
+          resolvedEdgesCount++;
+          fileOutgoing++;
+          incomingCounts.set(resolvedTarget, (incomingCounts.get(resolvedTarget) || 0) + 1);
+        }
+      } else if (!resolvedTarget) {
+        // Record unresolved or external dependency
+        unresolvedImports.push({
+          sourceFile: filePath,
+          specifier: imp.specifier,
+          line: imp.line,
+          reason: imp.specifier.startsWith('.') || imp.specifier.startsWith('/')
+            ? 'Target local file not found in repository inventory'
+            : 'External package dependency',
+        });
+      }
+    }
+
+    outgoingCounts.set(filePath, fileOutgoing);
+  }
+
+  // 3. Annotate nodes with incoming and outgoing counts
+  for (const node of nodes) {
+    node.incomingImportsCount = incomingCounts.get(node.id) || 0;
+    node.outgoingImportsCount = outgoingCounts.get(node.id) || 0;
+  }
+
+  // 4. Calculate accurate coverage statistics
+  const coverage: GraphCoverage = {
+    totalInventoryFiles: files.length,
+    eligibleFiles: files.length,
+    analyzedFiles: astMap.size,
+    skippedFiles: Math.max(0, files.length - sources.size),
+    parseFailedFiles: parseFailedCount,
+    isTruncated,
+    unresolvedImportsCount: unresolvedImports.length,
+    resolvedImportsCount: resolvedEdgesCount,
+  };
+
+  const graphData: GraphData = {
     nodes,
     edges,
     nodeCount: nodes.length,
     edgeCount: edges.length,
+    coverage,
+    unresolvedImports: unresolvedImports.slice(0, 100), // Cap list for payload budget
+  };
+
+  return { graphData, astMap };
+}
+
+/**
+ * Execute complete repository analysis: builds both Dependency Graph and Workflow Graph
+ */
+export function constructFullRepositoryAnalysis(
+  files: TreeFileItem[],
+  sources: Map<string, string>,
+  isTruncated = false,
+  rawTsConfig?: string
+): {
+  graphData: GraphData;
+  workflowGraph: WorkflowGraphData;
+  fileTree: FileTreeNode;
+} {
+  const tsconfig = rawTsConfig ? parseTsConfigFile(rawTsConfig) : undefined;
+  const allPathSet = new Set(files.map((f) => f.path));
+
+  // 1. Dependency Graph
+  const { graphData, astMap } = constructArchitectureGraph(
+    files,
+    sources,
+    tsconfig,
+    isTruncated
+  );
+
+  // 2. Workflow Graph
+  const workflowGraph = constructWorkflowGraph(
+    graphData.nodes,
+    astMap,
+    allPathSet,
+    tsconfig
+  );
+
+  // 3. File Tree
+  const fileTree = buildFileTree(files);
+
+  return {
+    graphData,
+    workflowGraph,
+    fileTree,
   };
 }

@@ -1,4 +1,14 @@
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Info, Network, GitFork } from 'lucide-react';
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  RotateCcw,
+  Info,
+  Network,
+  GitFork,
+  Layers,
+  Workflow,
+} from 'lucide-react';
 import { FileCategory } from '../../types';
 import { CATEGORY_COLORS } from '../../lib/category-colors';
 
@@ -11,6 +21,8 @@ interface GraphToolbarProps {
   isLegendOpen: boolean;
   layoutMode: 'graph' | 'tree';
   onToggleLayoutMode: (mode: 'graph' | 'tree') => void;
+  graphViewMode: 'dependency' | 'workflow';
+  onToggleGraphViewMode: (mode: 'dependency' | 'workflow') => void;
   selectedCategory: FileCategory | null;
   onSelectCategory: (category: FileCategory | null) => void;
 }
@@ -31,19 +43,50 @@ export function GraphToolbar({
   isLegendOpen,
   layoutMode,
   onToggleLayoutMode,
+  graphViewMode,
+  onToggleGraphViewMode,
   selectedCategory,
   onSelectCategory,
 }: GraphToolbarProps) {
   return (
     <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-      <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
+        {/* Dual-Graph Mode Switcher: Dependencies vs Workflow */}
+        <div className="flex items-center p-0.5 rounded-xl bg-surface-primary/95 backdrop-blur-md border border-border shadow-lg">
+          <button
+            onClick={() => onToggleGraphViewMode('dependency')}
+            title="Static file dependencies and imports"
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-body-xs font-mono transition-colors ${
+              graphViewMode === 'dependency'
+                ? 'bg-accent-blue/15 text-accent-blue font-bold border border-accent-blue/30 shadow-sm'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Dependencies</span>
+          </button>
+
+          <button
+            onClick={() => onToggleGraphViewMode('workflow')}
+            title="Evidence-backed runtime execution pipeline"
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-body-xs font-mono transition-colors ${
+              graphViewMode === 'workflow'
+                ? 'bg-accent-emerald/15 text-accent-emerald font-bold border border-accent-emerald/30 shadow-sm'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            <span>Workflow</span>
+          </button>
+        </div>
+
         {/* Graph / Tree Segmented Toggle */}
         <div className="flex items-center p-0.5 rounded-xl bg-surface-primary/95 backdrop-blur-md border border-border shadow-lg">
           <button
             onClick={() => onToggleLayoutMode('graph')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-body-xs font-mono transition-colors ${
               layoutMode === 'graph'
-                ? 'bg-accent-blue/15 text-accent-blue font-bold border border-accent-blue/30 shadow-sm'
+                ? 'bg-surface-elevated text-text-primary font-bold shadow-sm'
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
@@ -55,7 +98,7 @@ export function GraphToolbar({
             onClick={() => onToggleLayoutMode('tree')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-body-xs font-mono transition-colors ${
               layoutMode === 'tree'
-                ? 'bg-accent-blue/15 text-accent-blue font-bold border border-accent-blue/30 shadow-sm'
+                ? 'bg-surface-elevated text-text-primary font-bold shadow-sm'
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
@@ -64,40 +107,42 @@ export function GraphToolbar({
           </button>
         </div>
 
-        {/* Category Pills in Toolbar */}
-        <div className="hidden sm:flex items-center gap-1 p-1 rounded-xl bg-surface-primary/90 backdrop-blur-md border border-border shadow-lg">
-          <button
-            onClick={() => onSelectCategory(null)}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-              selectedCategory === null
-                ? 'bg-surface-elevated text-text-primary font-bold'
-                : 'text-text-muted hover:text-text-secondary'
-            }`}
-          >
-            All
-          </button>
-          {CATEGORIES.map((cat) => {
-            const def = CATEGORY_COLORS[cat];
-            const isSelected = selectedCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => onSelectCategory(isSelected ? null : cat)}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors border ${
-                  isSelected
-                    ? `${def.bg} ${def.text} ${def.border} font-bold`
-                    : 'text-text-muted border-transparent hover:text-text-secondary'
-                }`}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: def.solid }}
-                />
-                <span>{def.label.split(' ')[0]}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Category Pills (Only relevant in Dependency view) */}
+        {graphViewMode === 'dependency' && (
+          <div className="hidden sm:flex items-center gap-1 p-1 rounded-xl bg-surface-primary/90 backdrop-blur-md border border-border shadow-lg">
+            <button
+              onClick={() => onSelectCategory(null)}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                selectedCategory === null
+                  ? 'bg-surface-elevated text-text-primary font-bold'
+                  : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              All
+            </button>
+            {CATEGORIES.map((cat) => {
+              const def = CATEGORY_COLORS[cat];
+              const isSelected = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => onSelectCategory(isSelected ? null : cat)}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors border ${
+                    isSelected
+                      ? `${def.bg} ${def.text} ${def.border} font-bold`
+                      : 'text-text-muted border-transparent hover:text-text-secondary'
+                  }`}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: def.solid }}
+                  />
+                  <span>{def.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Right controls: Zoom, Fit, Reset, Legend */}
