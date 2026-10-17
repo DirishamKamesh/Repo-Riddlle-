@@ -1,18 +1,26 @@
-import { Routes, Route } from 'react-router-dom';
-import { LandingPage } from './pages/LandingPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { AnalysisPage } from './pages/AnalysisPage';
-import { InvestigationPage } from './pages/InvestigationPage';
-import { NotFoundPage } from './pages/NotFoundPage';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { LaunchBay } from './pages/LaunchBay';
+import { Dashboard } from './pages/Dashboard';
+import { ScanningSequence } from './pages/ScanningSequence';
+import { InvestigationWorkspace } from './pages/InvestigationWorkspace';
+import { NotFound } from './pages/NotFound';
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
-      <Route path="/analysis/:id" element={<AnalysisPage />} />
-      <Route path="/investigation/:id" element={<InvestigationPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LaunchBay />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/analysis/:id" element={<ScanningSequence />} />
+        <Route path="/investigation/:id" element={<InvestigationWorkspace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
